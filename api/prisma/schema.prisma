@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Municipality {
+  ibgeCode     String           @id @map("ibge_code")
+  name         String
+  uf           String
+  population   Int
+  cnpj         String
+  indicators   FiscalIndicator[]
+  deliveries   DeliveryStatus[]
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@map("municipalities")
+}
+
+model FiscalIndicator {
+  id                String       @id @default(cuid())
+  municipalityId    String       @map("municipality_id")
+  year              Int
+  revenue           Float        @default(0)
+  expense           Float        @default(0)
+  result            Float        @default(0)
+  educationPercent  Float        @default(0) @map("education_percent")
+  healthPercent     Float        @default(0) @map("health_percent")
+  personnelPercent  Float        @default(0) @map("personnel_percent")
+  municipality      Municipality @relation(fields: [municipalityId], references: [ibgeCode])
+
+  @@unique([municipalityId, year])
+  @@map("fiscal_indicators")
+}
+
+model DeliveryStatus {
+  id              String       @id @default(cuid())
+  municipalityId  String       @map("municipality_id")
+  reportType      String       @map("report_type")
+  status          String
+  deliveredAt     DateTime?    @map("delivered_at")
+  year            Int
+  periodicity     String?
+  municipality    Municipality @relation(fields: [municipalityId], references: [ibgeCode])
+
+  @@map("delivery_status")
+}
