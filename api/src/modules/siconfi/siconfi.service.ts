@@ -64,9 +64,8 @@ export class SiconfiService {
 
       for (const m of municipalitiesList) {
         try {
-          await this.syncRREO(m.ibgeCode, year - 1, m.name);
-          await this.syncRGF(m.ibgeCode, year - 1, m.name);
-          indicators += 1;
+          const synced = await this.syncSingle(m.ibgeCode);
+          if (synced) indicators++;
         } catch (err) {
           this.logger.warn(`Falha ao sincronizar ${m.ibgeCode} - ${m.name}: ${err.message}`);
         }
@@ -76,6 +75,16 @@ export class SiconfiService {
     }
 
     return { municipalities, indicators };
+  }
+
+  async syncSingle(ibgeCode: string): Promise<boolean> {
+    const m = await this.prisma.municipality.findUnique({ where: { ibgeCode } });
+    if (!m) return false;
+
+    const year = new Date().getFullYear();
+    await this.syncRREO(m.ibgeCode, year - 1, m.name);
+    await this.syncRGF(m.ibgeCode, year - 1, m.name);
+    return true;
   }
 
   private async syncMunicipalities(): Promise<number> {
