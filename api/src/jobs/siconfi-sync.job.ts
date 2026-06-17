@@ -19,8 +19,7 @@ export class SiconfiSyncJob {
     this.logger.log(
       `Sincronização concluída em ${elapsed}s. ` +
       `Municípios: ${result.municipalities}, ` +
-      `Indicadores: ${result.indicators}, ` +
-      `Entregas: ${result.deliveries}`,
+      `Indicadores: ${result.indicators}`,
     );
   }
 }

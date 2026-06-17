@@ -30,10 +30,30 @@ export class SiconfiService {
     return data;
   }
 
-  async syncAll(): Promise<{ municipalities: number; indicators: number; deliveries: number }> {
+  private extractValue(items: any[], codConta: string, coluna: string): number {
+    for (const i of items) {
+      if (i.cod_conta === codConta && i.coluna === coluna) {
+        return Number(i.valor) || 0;
+      }
+    }
+    return 0;
+  }
+
+  private sumValues(items: any[], codConta: string, coluna: string, filter?: string): number {
+    let total = 0;
+    for (const i of items) {
+      if (i.cod_conta === codConta && i.coluna === coluna) {
+        if (!filter || (i.conta && i.conta.includes(filter))) {
+          total += Number(i.valor) || 0;
+        }
+      }
+    }
+    return total;
+  }
+
+  async syncAll(): Promise<{ municipalities: number; indicators: number }> {
     let municipalities = 0;
     let indicators = 0;
-    let deliveries = 0;
 
     try {
       const entes = await this.syncMunicipalities();
@@ -44,14 +64,9 @@ export class SiconfiService {
 
       for (const m of municipalitiesList) {
         try {
-          const rreo = await this.syncRREO(m.ibgeCode, year);
-          if (rreo) indicators += rreo;
-
-          const rgf = await this.syncRGF(m.ibgeCode, year);
-          if (rgf) indicators += rgf;
-
-          const entregas = await this.syncDeliveries(m.ibgeCode, year);
-          deliveries += entregas;
+          await this.syncRREO(m.ibgeCode, year - 1, m.name);
+          await this.syncRGF(m.ibgeCode, year - 1, m.name);
+          indicators += 1;
         } catch (err) {
           this.logger.warn(`Falha ao sincronizar ${m.ibgeCode} - ${m.name}: ${err.message}`);
         }
@@ -60,7 +75,7 @@ export class SiconfiService {
       this.logger.error(`Erro na sincronização: ${err.message}`);
     }
 
-    return { municipalities, indicators, deliveries };
+    return { municipalities, indicators };
   }
 
   private async syncMunicipalities(): Promise<number> {
@@ -70,8 +85,8 @@ export class SiconfiService {
 
       let count = 0;
       for (const item of items) {
-        const ibgeCode = String(item.cod_ibge ?? "");
-        if (!ibgeCode) continue;
+        const ibgeCode = String(item.cod_ibge ?? "").padStart(7, "0");
+        if (!ibgeCode || ibgeCode.length < 7) continue;
 
         await this.prisma.municipality.upsert({
           where: { ibgeCode },
@@ -100,7 +115,7 @@ export class SiconfiService {
     }
   }
 
-  private async syncRREO(ibgeCode: string, year: number): Promise<number> {
+  private async syncRREO(ibgeCode: string, year: number, name: string): Promise<void> {
     try {
       const data: any = await this.get("/rreo", {
         an_exercicio: year,
@@ -109,43 +124,40 @@ export class SiconfiService {
         id_ente: ibgeCode,
       });
 
-      const items = Array.isArray(data) ? data : data?.items ?? [];
-      if (!items.length) return 0;
+      const items: any[] = Array.isArray(data) ? data : data?.items ?? [];
+      if (!items.length) {
+        this.logger.warn(`RREO sem dados para ${name} (${ibgeCode})/${year}`);
+        return;
+      }
 
-      const latest = items[items.length - 1];
-      const revenue = Number(latest.receita_total) || 0;
-      const expense = Number(latest.despesa_total) || 0;
-      const education = Number(latest.percentual_educacao) || 0;
-      const health = Number(latest.percentual_saude) || 0;
+      const revenue = this.extractValue(items, "ReceitasExcetoIntraOrcamentarias", "Até o Bimestre (c)");
+      const expense = this.extractValue(items, "DespesasExcetoIntraOrcamentarias", "DESPESAS EMPENHADAS ATÉ O BIMESTRE (f)")
+        || this.extractValue(items, "DespesasExcetoIntraOrcamentarias", "DESPESAS LIQUIDADAS ATÉ O BIMESTRE (h)");
+
+      if (revenue === 0 && expense === 0) {
+        this.logger.warn(`RREO sem valores para ${name} (${ibgeCode})/${year}`);
+        return;
+      }
+
+      const educationDespesa = this.extractValue(items, "MinimoAnualDasReceitasDeImpostosNaManutencaoEDesenvolvimentoDoEnsinoDemonstrativoSimplificado", "Valor Apurado Até o Bimestre");
+      const healthDespesa = this.extractValue(items, "AplicacaoTotalDasDespesasComAcoesEServicosPublicosDeSaude", "Valor Apurado Até o Bimestre");
+
+      const educationPercent = expense > 0 ? +((educationDespesa / expense) * 100).toFixed(2) : 0;
+      const healthPercent = expense > 0 ? +((healthDespesa / expense) * 100).toFixed(2) : 0;
 
       await this.prisma.fiscalIndicator.upsert({
         where: { municipalityId_year: { municipalityId: ibgeCode, year } },
-        update: {
-          revenue,
-          expense,
-          result: revenue - expense,
-          educationPercent: education,
-          healthPercent: health,
-        },
-        create: {
-          municipalityId: ibgeCode,
-          year,
-          revenue,
-          expense,
-          result: revenue - expense,
-          educationPercent: education,
-          healthPercent: health,
-        },
+        update: { revenue, expense, result: revenue - expense, educationPercent, healthPercent },
+        create: { municipalityId: ibgeCode, year, revenue, expense, result: revenue - expense, educationPercent, healthPercent },
       });
 
-      return 1;
+      this.logger.log(`RREO OK ${name}/${year}: R$ ${(revenue/1e9).toFixed(2)}B`);
     } catch (err) {
-      this.logger.warn(`Falha RREO ${ibgeCode}/${year}: ${err.message}`);
-      return 0;
+      this.logger.warn(`Falha RREO ${name}/${year}: ${err.message}`);
     }
   }
 
-  private async syncRGF(ibgeCode: string, year: number): Promise<number> {
+  private async syncRGF(ibgeCode: string, year: number, name: string): Promise<void> {
     try {
       const data: any = await this.get("/rgf", {
         an_exercicio: year,
@@ -156,11 +168,19 @@ export class SiconfiService {
         id_ente: ibgeCode,
       });
 
-      const items = Array.isArray(data) ? data : data?.items ?? [];
-      if (!items.length) return 0;
+      const items: any[] = Array.isArray(data) ? data : data?.items ?? [];
+      if (!items.length) {
+        this.logger.warn(`RGF sem dados para ${name} (${ibgeCode})/${year}`);
+        return;
+      }
 
-      const latest = items[items.length - 1];
-      const personnelPercent = Number(latest.percentual_pessoal) || 0;
+      let personnelPercent = 0;
+      for (const i of items) {
+        if (i.cod_conta === "RGF" && i.coluna === "%" && i.conta && i.conta.includes("Pessoal")) {
+          personnelPercent = Number(i.valor) || 0;
+          break;
+        }
+      }
 
       const existing = await this.prisma.fiscalIndicator.findUnique({
         where: { municipalityId_year: { municipalityId: ibgeCode, year } },
@@ -171,55 +191,11 @@ export class SiconfiService {
           where: { municipalityId_year: { municipalityId: ibgeCode, year } },
           data: { personnelPercent },
         });
-      } else {
-        await this.prisma.fiscalIndicator.create({
-          data: {
-            municipalityId: ibgeCode,
-            year,
-            revenue: 0,
-            expense: 0,
-            result: 0,
-            personnelPercent,
-          },
-        });
       }
 
-      return 1;
+      this.logger.log(`RGF OK ${name}/${year}: ${personnelPercent}%`);
     } catch (err) {
-      this.logger.warn(`Falha RGF ${ibgeCode}/${year}: ${err.message}`);
-      return 0;
-    }
-  }
-
-  private async syncDeliveries(ibgeCode: string, year: number): Promise<number> {
-    try {
-      const data: any = await this.get("/extrato_entregas", {
-        id_ente: ibgeCode,
-        an_referencia: year,
-      });
-
-      const items = Array.isArray(data) ? data : data?.items ?? [];
-      let count = 0;
-
-      for (const item of items) {
-        await this.prisma.deliveryStatus.create({
-          data: {
-            municipalityId: ibgeCode,
-            reportType: item.entregavel ?? "",
-            status: item.status_relatorio ?? "",
-            deliveredAt: item.data_status ? new Date(item.data_status) : null,
-            year,
-            periodicity: item.periodicidade ?? null,
-          },
-        });
-        count++;
-      }
-
-      this.logger.log(`${count} entregas para ${ibgeCode}`);
-      return count;
-    } catch (err) {
-      this.logger.warn(`Falha entregas ${ibgeCode}/${year}: ${err.message}`);
-      return 0;
+      this.logger.warn(`Falha RGF ${name}/${year}: ${err.message}`);
     }
   }
 }

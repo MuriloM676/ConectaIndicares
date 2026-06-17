@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { HttpModule } from "@nestjs/axios";
 import { SiconfiService } from "./siconfi.service";
+import { SiconfiController } from "./siconfi.controller";
 import { SiconfiSyncJob } from "../../jobs/siconfi-sync.job";
 
 @Module({
@@ -10,6 +11,7 @@ import { SiconfiSyncJob } from "../../jobs/siconfi-sync.job";
       timeout: 30000,
     }),
   ],
+  controllers: [SiconfiController],
   providers: [SiconfiService, SiconfiSyncJob],
   exports: [SiconfiService],
 })
