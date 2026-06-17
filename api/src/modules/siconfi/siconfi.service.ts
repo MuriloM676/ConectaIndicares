@@ -148,8 +148,14 @@ export class SiconfiService {
         return;
       }
 
-      const educationDespesa = this.extractValue(items, "MinimoAnualDasReceitasDeImpostosNaManutencaoEDesenvolvimentoDoEnsinoDemonstrativoSimplificado", "Valor Apurado Até o Bimestre");
-      const healthDespesa = this.extractValue(items, "AplicacaoTotalDasDespesasComAcoesEServicosPublicosDeSaude", "Valor Apurado Até o Bimestre");
+      let educationDespesa = this.extractValue(items, "MinimoAnualDasReceitasDeImpostosNaManutencaoEDesenvolvimentoDoEnsinoDemonstrativoSimplificado", "Valor Apurado Até o Bimestre");
+      if (!educationDespesa) {
+        educationDespesa = this.sumValues(items, "RREO2TotalDespesas", "DESPESAS EMPENHADAS ATÉ O BIMESTRE (b)", "Ensino");
+      }
+      let healthDespesa = this.extractValue(items, "AplicacaoTotalDasDespesasComAcoesEServicosPublicosDeSaude", "Valor Apurado Até o Bimestre");
+      if (!healthDespesa) {
+        healthDespesa = this.sumValues(items, "RREO2TotalDespesas", "DESPESAS EMPENHADAS ATÉ O BIMESTRE (b)", "Saúde");
+      }
 
       const educationPercent = expense > 0 ? +((educationDespesa / expense) * 100).toFixed(2) : 0;
       const healthPercent = expense > 0 ? +((healthDespesa / expense) * 100).toFixed(2) : 0;

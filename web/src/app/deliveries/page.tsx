@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Combobox } from "@/components/ui/combobox";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { getDeliveries, getMunicipalities, DeliveryItem } from "@/lib/api";
@@ -41,17 +42,15 @@ export default function DeliveriesPage() {
           Entregas SICONFI
         </h2>
         <div className="flex gap-4">
-          <Select
+          <Combobox
             value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-          >
-            <option value="">Selecione um município</option>
-            {municipalities.map((m) => (
-              <option key={m.ibgeCode} value={m.ibgeCode}>
-                {m.name} - {m.uf}
-              </option>
-            ))}
-          </Select>
+            onChange={setSelected}
+            options={municipalities.map((m) => ({
+              value: m.ibgeCode,
+              label: `${m.name} - ${m.uf}`,
+            }))}
+            placeholder="Selecione um município"
+          />
           <Select
             value={year ?? ""}
             onChange={(e) =>

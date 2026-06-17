@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Combobox } from "@/components/ui/combobox";
 import { Select } from "@/components/ui/select";
 import { getComparison, getMunicipalities } from "@/lib/api";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
@@ -50,22 +51,24 @@ export default function ComparisonPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Select value={mA} onChange={(e) => setMA(e.target.value)}>
-          <option value="">Município A</option>
-          {municipalities.map((m) => (
-            <option key={m.ibgeCode} value={m.ibgeCode}>
-              {m.name} - {m.uf}
-            </option>
-          ))}
-        </Select>
-        <Select value={mB} onChange={(e) => setMB(e.target.value)}>
-          <option value="">Município B</option>
-          {municipalities.map((m) => (
-            <option key={m.ibgeCode} value={m.ibgeCode}>
-              {m.name} - {m.uf}
-            </option>
-          ))}
-        </Select>
+        <Combobox
+          value={mA}
+          onChange={setMA}
+          options={municipalities.map((m) => ({
+            value: m.ibgeCode,
+            label: `${m.name} - ${m.uf}`,
+          }))}
+          placeholder="Município A"
+        />
+        <Combobox
+          value={mB}
+          onChange={setMB}
+          options={municipalities.map((m) => ({
+            value: m.ibgeCode,
+            label: `${m.name} - ${m.uf}`,
+          }))}
+          placeholder="Município B"
+        />
       </div>
 
       {!mA || !mB ? (

@@ -14,7 +14,9 @@ async function main() {
   let count = 0;
   for (const item of items) {
     const ibgeCode = String(item.cod_ibge ?? "").padStart(7, "0");
+    const codRaw = String(item.cod_ibge ?? "");
     if (!ibgeCode || ibgeCode.length < 7) continue;
+    if (Number(codRaw) < 100 || item.uf === "BR") continue;
 
     await prisma.municipality.upsert({
       where: { ibgeCode },

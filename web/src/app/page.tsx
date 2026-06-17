@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Combobox } from "@/components/ui/combobox";
 import { Select } from "@/components/ui/select";
 import {
   getDashboard,
@@ -23,21 +24,58 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
   const [municipalities, setMunicipalities] = useState<any[]>([]);
   const [selected, setSelected] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState<DashboardData | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     getMunicipalities().then(setMunicipalities);
   }, []);
 
+  const fetchDashboard = (ibgeCode: string, y: number) => {
+    getDashboard(ibgeCode, y).then((result) => {
+      setData(result);
+      if (result.revenue === null && result.expense === null) {
+        setSyncing(true);
+      } else {
+        setSyncing(false);
+      }
+    });
+  };
+
   useEffect(() => {
-    if (!selected) return;
-    getDashboard(selected, year).then(setData);
+    if (!selected) {
+      setData(null);
+      setSyncing(false);
+      return;
+    }
+    fetchDashboard(selected, year);
   }, [selected, year]);
+
+  useEffect(() => {
+    if (syncing) {
+      pollRef.current = setInterval(() => {
+        getDashboard(selected, year).then((result) => {
+          setData(result);
+          if (result.revenue !== null || result.expense !== null) {
+            setSyncing(false);
+          }
+        });
+      }, 3000);
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [syncing, selected, year]);
 
   const chartData = data
     ? [
@@ -50,28 +88,36 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Dashboard Fiscal</h2>
-        <div className="flex gap-4">
-          <Select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-          >
-            <option value="">Selecione um município</option>
-            {municipalities.map((m) => (
-              <option key={m.ibgeCode} value={m.ibgeCode}>
-                {m.name} - {m.uf}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-          >
-            {[2025, 2024, 2023, 2022, 2021].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </Select>
+        <div className="flex gap-4 items-center">
+          {syncing && (
+            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="animate-spin" size={16} />
+              Sincronizando dados...
+            </span>
+          )}
+          <div className="w-80">
+            <Combobox
+              value={selected}
+              onChange={setSelected}
+              options={municipalities.map((m) => ({
+                value: m.ibgeCode,
+                label: `${m.name} - ${m.uf}`,
+              }))}
+              placeholder="Selecione um município"
+            />
+          </div>
+          <div className="w-24">
+            <Select
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+            >
+              {[2025, 2024, 2023, 2022, 2021].map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
       </div>
 
