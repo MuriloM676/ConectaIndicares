@@ -25,16 +25,21 @@ export class DashboardService {
     });
 
     if (!indicator) {
-      this.siconfi.syncSingle(ibgeCode);
-      return {
-        revenue: null,
-        expense: null,
-        result: null,
-        population: municipality.population,
-        educationPercent: null,
-        healthPercent: null,
-        personnelPercent: null,
-      };
+      await this.siconfi.syncSingle(ibgeCode);
+      indicator = await this.prisma.fiscalIndicator.findUnique({
+        where: { municipalityId_year: { municipalityId: ibgeCode, year } },
+      });
+      if (!indicator) {
+        return {
+          revenue: null,
+          expense: null,
+          result: null,
+          population: municipality.population,
+          educationPercent: null,
+          healthPercent: null,
+          personnelPercent: null,
+        };
+      }
     }
 
     return {

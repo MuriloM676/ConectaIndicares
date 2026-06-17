@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -29,53 +29,25 @@ import { Loader2 } from "lucide-react";
 export default function DashboardPage() {
   const [municipalities, setMunicipalities] = useState<any[]>([]);
   const [selected, setSelected] = useState("");
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [year, setYear] = useState(new Date().getFullYear() - 1);
   const [data, setData] = useState<DashboardData | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     getMunicipalities().then(setMunicipalities);
   }, []);
 
-  const fetchDashboard = (ibgeCode: string, y: number) => {
-    getDashboard(ibgeCode, y).then((result) => {
-      setData(result);
-      if (result.revenue === null && result.expense === null) {
-        setSyncing(true);
-      } else {
-        setSyncing(false);
-      }
-    });
-  };
-
   useEffect(() => {
     if (!selected) {
       setData(null);
-      setSyncing(false);
       return;
     }
-    fetchDashboard(selected, year);
+    setLoading(true);
+    getDashboard(selected, year).then((result) => {
+      setData(result);
+      setLoading(false);
+    });
   }, [selected, year]);
-
-  useEffect(() => {
-    if (syncing) {
-      pollRef.current = setInterval(() => {
-        getDashboard(selected, year).then((result) => {
-          setData(result);
-          if (result.revenue !== null || result.expense !== null) {
-            setSyncing(false);
-          }
-        });
-      }, 3000);
-    }
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [syncing, selected, year]);
 
   const chartData = data
     ? [
@@ -89,7 +61,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Dashboard Fiscal</h2>
         <div className="flex gap-4 items-center">
-          {syncing && (
+          {loading && (
             <span className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="animate-spin" size={16} />
               Sincronizando dados...

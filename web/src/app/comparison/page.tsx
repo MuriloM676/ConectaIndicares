@@ -11,7 +11,7 @@ export default function ComparisonPage() {
   const [municipalities, setMunicipalities] = useState<any[]>([]);
   const [mA, setMA] = useState("");
   const [mB, setMB] = useState("");
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [year, setYear] = useState(new Date().getFullYear() - 1);
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {

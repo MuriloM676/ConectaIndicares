@@ -14,7 +14,7 @@ const UFS = [
 
 export default function RankingPage() {
   const [uf, setUf] = useState("");
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [year, setYear] = useState(new Date().getFullYear() - 1);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{
     items: RankingItem[];
