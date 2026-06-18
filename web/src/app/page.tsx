@@ -18,6 +18,7 @@ import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
 import {
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -55,6 +56,9 @@ export default function DashboardPage() {
         { name: "Despesa", value: data.expense ?? 0 },
       ]
     : [];
+
+  const REVENUE_COLOR = "hsl(152, 61%, 38%)";
+  const EXPENSE_COLOR = "hsl(0, 65%, 50%)";
 
   return (
     <div className="space-y-6">
@@ -201,19 +205,89 @@ export default function DashboardPage() {
           </div>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Receita x Despesa</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Receita x Despesa</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Valores totais do exercício de {year}
+              </p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip
-                    formatter={(v: number) => formatCurrency(v)}
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 8, right: 8, left: -8, bottom: 4 }}
+                  barCategoryGap="30%"
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                    vertical={false}
                   />
-                  <Bar dataKey="value" fill="hsl(221.2, 83.2%, 53.3%)" />
+                  <XAxis
+                    dataKey="name"
+                    tickLine={false}
+                    axisLine={{ stroke: "hsl(var(--border))" }}
+                    tick={{
+                      fontSize: 13,
+                      fill: "hsl(var(--muted-foreground))",
+                    }}
+                    dy={8}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{
+                      fontSize: 12,
+                      fill: "hsl(var(--muted-foreground))",
+                    }}
+                    tickFormatter={(v: number) =>
+                      v >= 1_000_000
+                        ? `R$ ${(v / 1_000_000).toFixed(1)} mi`
+                        : v >= 1_000
+                          ? `R$ ${(v / 1_000).toFixed(0)} mil`
+                          : `R$ ${v}`
+                    }
+                    width={80}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                      boxShadow:
+                        "0 4px 12px rgba(0,0,0,0.08)",
+                      padding: "12px 14px",
+                      fontSize: "13px",
+                    }}
+                    labelStyle={{
+                      fontWeight: 600,
+                      marginBottom: "4px",
+                    }}
+                    formatter={(value: number) => [
+                      formatCurrency(value),
+                      "Valor",
+                    ]}
+                    cursor={{ fill: "hsl(var(--muted))", radius: 4 }}
+                  />
+                  <Bar
+                    dataKey="value"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={80}
+                    animationBegin={0}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  >
+                    {chartData.map((entry) => (
+                      <Cell
+                        key={entry.name}
+                        fill={
+                          entry.name === "Receita"
+                            ? REVENUE_COLOR
+                            : EXPENSE_COLOR
+                        }
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
